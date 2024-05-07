@@ -7,10 +7,11 @@
 #------------------------------------------------------------------------------+
 
 #-------Libraries and Dependencies:--------------------------------------------+
+from __future__ import division
 import numpy as np
 import random
 import math
-from __future__ import division
+
 
 #---COST FUNCTION -------------------------------------------------------------+
 
@@ -108,4 +109,22 @@ class PSO():
             for j in range(0,num_particles):
                 swarm[j].update_velocity(group_best_position)
                 swarm[j].update_position(bounds)
+            
+            #loop again
+            i+=1
+        #print final results
+        print('Final:')
+        print(group_position_best)
+        print(group_error_best)
+
+#if __name__ == "__PSO__":
+#    main()
+
+#---RUN------------------------------------------------------------------------+    
+
+initial = [5,5]              #starting location [x1,x2,x3,....]
+bounds = [(-10,10),(-10,10)] #bounds for search [(x1min,x1max),(x2min,x2max),..]
+PSO(func1,initial,bounds,num_particles=20,maxiter=30)
+
+#---END------------------------------------------------------------------------+    
 
