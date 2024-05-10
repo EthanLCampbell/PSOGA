@@ -11,7 +11,7 @@ from __future__ import division
 import numpy as np
 import random
 import math
-
+from pso.cost_functions import sphere #another function to check with
 
 #---COST FUNCTION -------------------------------------------------------------+
 
@@ -31,14 +31,14 @@ class Particle:
         self.position_i = []        # particle position
         self.velocity_i = []        # particle velocity
         self.best_position_i = []   # individual best position
-        self.error_i = []           # individual error
-        self.error_best_i = []      # individual best error
-        self.best_fitness = float('inf') #fitness function
+        self.error_i = -1           # individual error
+        self.error_best_i = -1      # individual best error
+        #self.best_fitness = float('inf') #fitness function
 
-    # particle update states based on random velocity input
-    for i in range(0,num_dimensions):
-        self.velocity_i.append(random.uniform(-1,1))
-        self.position_i.append(x0[i])
+        # particle update states based on random velocity input
+        for i in range(0,num_dimensions):
+            self.velocity_i.append(random.uniform(-1,1))
+            self.position_i.append(x0[i])
 
     # current fitness evaluation
     def evaluate(self,costFunction):
@@ -51,8 +51,8 @@ class Particle:
     #update new particle velocity 
     def update_velocity(self,group_best_position):
         #Search constants
-        inrta = 0.5 # intertia weight (tendency toward last velocity)
-        cog = 1       # cognative weight (tendency toward individual best)
+        inertia = 0.5   # intertia weight (tendency toward last velocity)
+        cog = 1       # cognitive weight (tendency toward individual best)
         soc = 1       # social weight (tendency toward global best)
 
         for i in range (0,num_dimensions):
@@ -61,7 +61,7 @@ class Particle:
 
             vel_cog = cog*r1*(self.best_position_i[i] - self.position_i[i])
             vel_soc = soc*r2*(group_best_position - self.position_i[i])
-            self.velocity_i[i] = inrta*self.velocityIi[i] + vel_cog + vel_soc
+            self.velocity_i[i] = inertia*self.velocity_i[i] + vel_cog + vel_soc
 
     # update position based off new vel updates
     def update_position(self,bounds):
@@ -70,21 +70,21 @@ class Particle:
 
             #new maximum position bound if necessary
             if self.position_i[i]>bounds[i][0]:
-                self.position_i[i] = bounds[i][0]
+                self.position_i[i] = bounds[i][1]
             
             #new minimum position bound if necessary
             if self.position_i[i]<bounds[i][0]:
-                self.position_i[i][0]
+                self.position_i[i][0] = bounds[i][0]
 
 #---Swarm Optimization Function------------------------------------------------+    
 
 class PSO():
-    def __init__(self,costFunction,x0,bounds,num_particles,maxiter):
+    def particle_swarm(costFunction,x0,bounds,num_particles,maxiter):
         global num_dimensions #number for total 
 
         num_dimensions = len(x0)
         group_error_best = -1            #best error for the group
-        group_best_position = []         #best position for group
+        group_best_position = -1         #best position for group
 
         #establish full swarm
         swarm = []
@@ -95,9 +95,9 @@ class PSO():
         i = 0
         while i<maxiter:
             #print i, group_error_best
-
+            print(f'iter: {i:>4d}, best solution: {group_error_best:10.6f}')
             #cycle through particles in swarm and evaluate fitness
-            for j in range():
+            for j in range(0,num_particles):
                 swarm[j].evaluate(costFunction)
 
                 #determine if particle_j is global best
@@ -114,17 +114,14 @@ class PSO():
             i+=1
         #print final results
         print('Final:')
-        print(group_position_best)
-        print(group_error_best)
+        print(f'   > {group_position_best}')
+        print(f'   > {group_error_best}\n')
 
-#if __name__ == "__PSO__":
-#    main()
-
+        return group_error_best, group_position_best
 #---RUN------------------------------------------------------------------------+    
 
-initial = [5,5]              #starting location [x1,x2,x3,....]
+x0 = [5,5]                   #starting location [x1,x2,x3,....]
 bounds = [(-10,10),(-10,10)] #bounds for search [(x1min,x1max),(x2min,x2max),..]
-PSO(func1,initial,bounds,num_particles=20,maxiter=30)
+PSO.particle_swarm(sphere,x0,bounds,num_particles=20,maxiter=11)
 
 #---END------------------------------------------------------------------------+    
-
