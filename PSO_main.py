@@ -80,62 +80,89 @@ class Particle:
 
 #---Swarm Optimization Function------------------------------------------------+    
 
-class PSO():
-    def particle_swarm(costFunction,x0,bounds,num_particles,maxiter):
-        global num_dimensions #number for total 
-        global xdata_fields
-        global ydata_fields
+#particle swarm optimization function
+def pso(func, bounds, swarm_size=10, inertia=0.5, pv=1, gv=1, 
+        max_vnorm=10, num_iters=100, verbose=False, func_name=None):
+    # """Particle Swarm Optimization (PSO)
+    # Input:
+    #     func - cost function
+    #     bounds - list, xy dimension bounds
+    #     swarm_size - int, the number of fish
+    #     inertia: float, tendency to not change velocity
+    #     pv: float, tendency to personal best 
+    #     gv: float, tendency to global best
+    #     max_vnorm: max velocity norm
+    #     num_iters: int, the number of iterations
+    #     verbose: boolean, whether to print results or not
+    #     func_name: the name of object function to optimize
 
-        num_dimensions = len(x0)
-        group_error_best = -1            #best error for the group
-        group_best_position = -1         #best position for group
+    # Returns
+    #     history: history of particles and global bests
+    # """
+    bounds = np.array(bounds)
+    assert np.all(bounds[:,0] < bounds[:,1]) # each boundaries have to satisfy this condition
+    dim = len(bounds)
+    X = np.random.rand(swarm_size, dim) # range:0~1, domain:(swarm_size,dim)
+    print('## Optimize:',func_name)
 
-        #establish full swarm
-        swarm = []
-        for i in range(0,num_particles):
-            swarm.append(Particle(x0))
+    def clip_by_norm(x, max_norm):
+        norm = np.linalg.norm(x)
+        return x if norm <=max_norm else x * max_norm / norm
 
-        #optimization loop
-        i = 0
-        xdata = []
-        ydata = []
-        while i<maxiter:
-            #print i, group_error_best
-            print(f'iter: {i:>4d}, best solution: {group_error_best:10.6f}')
-            #cycle through particles in swarm and evaluate fitness
-            for j in range(0,num_particles):
-                swarm[j].evaluate(costFunction)
+    # Initialize all particle randomly in the search-space
+    particles = X * (bounds[:,1]-bounds[:,0]) + bounds[:,0]
+    velocities = X * (bounds[:,1]-bounds[:,0]) + bounds[:,0]
+    personal_bests = np.copy(particles)
+    personal_best_fitness = [np.inf for p in particles] 
+    global_best_idx = np.argmin(personal_best_fitness)
+    global_best = personal_bests[global_best_idx]
+    global_best_fitness = func(global_best)
 
-                #determine if particle_j is global best
-                if swarm[j].error_i < group_error_best or group_error_best == -1:
-                    group_position_best = list(swarm[j].position_i)
-                    group_error_best = float(swarm[j].error_i)
-            
-            #through swarm and update vel and pos
-            for j in range(0,num_particles):
-                swarm[j].update_velocity(group_best_position)
-                swarm[j].update_position(bounds)
-            
-            #arrays of position to be animated:
-            xdata_fields = []
-            ydata_fields = []
-            for j in range(0,num_particles):
-                xdata = []
-                ydata = []
-                for n in range(0,maxiter):
-                    xdata.append(swarm[j].position_i[0])
-                    ydata.append(swarm[j].position_i[1])
-                xdata_fields.append(xdata)
-                ydata_fields.append(ydata)
-            #loop again
-            i+=1
+    # define history object to have all info to be passed to animation function
+    history = {'particles':[], 
+               'global_best_fitness':[], 
+               'global_best':[[np.inf, np.inf] for i in range(num_iters)],
+               'obj_func': func_name,}
 
-        #print final results
-        print('Final:')
-        print(f'   > {group_position_best}')
-        print(f'   > {group_error_best}\n')
+    # Iteration starts
+    for i in range(num_iters):
+        history['particles'].append(particles)
+        history['global_best_fitness'].append(global_best_fitness)
+        # history['global_best'].append(global_best) # seems not working
+        history['global_best'][i][0] = global_best[0]
+        history['global_best'][i][1] = global_best[1]
 
-        return group_error_best, group_position_best
+        if verbose: print('iter# {}:'.format(i), end='')
+        # Evaluate current swarm's fitness:
+        # personal best
+        for p_i in range(swarm_size):
+            fitness = func(particles[p_i])
+            if fitness < personal_best_fitness[p_i]:
+                personal_bests[p_i] = particles[p_i] # particle
+                personal_best_fitness[p_i] = fitness # its fitness
+        
+        # global best
+        if np.min(personal_best_fitness) < global_best_fitness:
+            global_best_idx = np.argmin(personal_best_fitness)
+            global_best = personal_bests[global_best_idx]
+            global_best_fitness = func(global_best)
+
+        # Compute new velocities based on fish brain weightings
+        vel_old = inertia * velocities #inertial
+        vel_personal = pv * np.random.rand() * (personal_bests - particles) #cognitive
+        vel_global = gv * np.random.rand() * (global_best - particles) #social 
+        velocities = vel_old + vel_personal + vel_global #update vel
+        velocities = clip_by_norm(velocities, max_vnorm) 
+
+        # Update position
+        particles = particles + velocities
+
+        # if verbose, print intermediate steps
+        if verbose:
+            print(' Fitness:{:.5f}, Position:{}, Velocity:{}'.format(global_best_fitness, global_best, np.linalg.norm(velocities)))
+
+    return history
+
     
 #---RUN------------------------------------------------------------------------+    
 
