@@ -2,7 +2,7 @@
 # 
 # Ethan Labianca-Campbell - Purdue MSAA '26 
 # Particle Swarm Optimization (PSO) Framework with Python
-# Last Update: May 10, 2024 
+# Last Update: May 12, 2024 
 # 
 #------------------------------------------------------------------------------+
 
@@ -14,74 +14,39 @@ from pso.cost_functions import sphere #another function to check with
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import PillowWriter
+import os
+from matplotlib import animation
 
-#---COST FUNCTION -------------------------------------------------------------+
+#---COST FUNCTIONS-------------------------------------------------------------+
 
-#Function to optimize (minimize)
-def func1(x):
+#Functions to optimize (minimize)
+
+def paraboloid(x):
+    # Paraboloid function
+    # Domain: -10 < xi < 10 
+    # Global minimum: f_min(0,0)=0
     total = 0
     for i in range(len(x)):
         total+= x[i]**2
     return total
 
-#---Particle Function Definition-----------------------------------------------+
+def ackley_fun(x):
+    # Ackley function
+    # Domain: -32 < xi < 32
+    # Global minimum: f_min(0,..,0)=0
+    return -20 * np.exp(-.2*np.sqrt(.5*(x[0]**2 + x[1]**2))) - np.exp(.5*(np.cos(np.pi*2*x[0])+np.cos(np.pi*2*x[1]))) + np.exp(1) + 20
 
-class Particle:
-    # Define Particle Variables
-    def __init__(self,x0):
-        # individual particle variables 
-        self.position_i = []        # particle position
-        self.velocity_i = []        # particle velocity
-        self.best_position_i = []   # individual best position
-        self.error_i = -1           # individual error
-        self.error_best_i = -1      # individual best error
-        #self.best_fitness = float('inf') #fitness function
+def rosenbrock_fun(x):
+    # Rosenbrock function
+    # Domain: -5 < xi < 5
+    # Global minimun: f_min(1,..,1)=0
+    return 100*(x[1] - x[0]**2)**2 + (x[0]-1)**2
 
-        # particle update states based on random velocity input
-        for i in range(0,num_dimensions):
-            self.velocity_i.append(random.uniform(-1,1))
-            self.position_i.append(x0[i])
 
-    # current fitness evaluation
-    def evaluate(self,costFunction):
-        self.error_i = costFunction(self.position_i)
-        #check if particle position is individual best
-        if self.error_i < self.error_best_i or self.error_best_i == -1:
-            self.best_position_i = self.position_i.copy()
-            self.error_best_i = self.error_i
-
-    #update new particle velocity 
-    def update_velocity(self,group_best_position):
-        #Search constants
-        inertia = 0.5   # intertia weight (tendency toward last velocity)
-        cog = 1      # cognitive weight (tendency toward individual best)
-        soc = 0.8       # social weight (tendency toward global best)
-
-        for i in range (0,num_dimensions):
-            r1 = random.random() #random permutation on cognitive
-            r2 = random.random() #random permutation on social
-
-            vel_cog = cog*r1*(self.best_position_i[i] - self.position_i[i])
-            vel_soc = soc*r2*(group_best_position - self.position_i[i])
-            self.velocity_i[i] = inertia*self.velocity_i[i] + vel_cog + vel_soc
-
-    # update position based off new vel updates
-    def update_position(self,bounds):
-        for i in range(0,num_dimensions):
-            self.position_i[i] = self.position_i[i] + self.velocity_i[i]
-
-            #new maximum position bound if necessary
-            if self.position_i[i]>bounds[i][1]:
-                self.position_i[i] = bounds[i][1]
-            
-            #new minimum position bound if necessary
-            if self.position_i[i]<bounds[i][0]:
-                self.position_i[i][0] = bounds[i][0]
-
-#---Swarm Optimization Function------------------------------------------------+    
+#---OPTIMIZATION ALGORITHMS ----------------------------------------------------+    
 
 #particle swarm optimization function
-def pso(func, bounds, swarm_size=10, inertia=0.5, pv=1, gv=1, 
+def pso(func, bounds, swarm_size=10, inertia=0.5, c1=0.7, c2=0.9, 
         max_vnorm=10, num_iters=100, verbose=False, func_name=None):
     # """Particle Swarm Optimization (PSO)
     # Input:
@@ -149,8 +114,8 @@ def pso(func, bounds, swarm_size=10, inertia=0.5, pv=1, gv=1,
 
         # Compute new velocities based on fish brain weightings
         vel_old = inertia * velocities #inertial
-        vel_personal = pv * np.random.rand() * (personal_bests - particles) #cognitive
-        vel_global = gv * np.random.rand() * (global_best - particles) #social 
+        vel_personal = c1 * np.random.rand() * (personal_bests - particles) #cognitive
+        vel_global = c2 * np.random.rand() * (global_best - particles) #social 
         velocities = vel_old + vel_personal + vel_global #update vel
         velocities = clip_by_norm(velocities, max_vnorm) 
 
@@ -163,42 +128,148 @@ def pso(func, bounds, swarm_size=10, inertia=0.5, pv=1, gv=1,
 
     return history
 
+#---ANIMATIONS-----------------------------------------------------------------+    
+
+def visualizeHistory2D(func, history, bounds, 
+                       minima, func_name, save2mp4=False, save2gif=False):
+    # Visualize the process of optimizing
+    # Arguments
+    #     func: object function
+    #     history: dict, object returned from pso above
+    #     bounds: list, bounds of each dimention
+    #     minima: list, the exact minima to show in the plot
+    #     func_name: str, the name of the object function
+    #     save2mp4: bool, whether to save as mp4 or not
+
+    print('## Visualizing optimizing {}'.format(func_name))
+    assert len(bounds)==2
+
+    # define meshgrid according to given boundaries
+    x = np.linspace(bounds[0][0], bounds[0][1], 50)
+    y = np.linspace(bounds[1][0], bounds[1][1], 50)
+    X, Y = np.meshgrid(x, y)
+    Z = np.array([func([x, y]) for x, y in zip(X, Y)])
+
+    # initialize figure
+    fig = plt.figure(figsize=(13, 6))
+    ax1 = fig.add_subplot(121, facecolor='w')
+    ax2 = fig.add_subplot(122, facecolor='w')
+
+    # animation callback function
+    def animate(frame, history):
+        # print('current frame:',frame)
+        ax1.cla()
+        ax1.set_xlabel('Horz Position')
+        ax1.set_ylabel('Vert Position')
+        ax1.set_title('{}|iter={}|Gbest=({:.5f},{:.5f})'.format(func_name,frame+1,
+                      history['global_best'][frame][0], history['global_best'][frame][1]))
+        ax1.set_xlim(bounds[0][0], bounds[0][1])
+        ax1.set_ylim(bounds[1][0], bounds[1][1])
+        ax2.set_xlabel('Iteration')
+        ax2.set_ylabel('Fitness')
+        ax2.set_title('Fitness with Population={} & MinVal={:}'.format(len(history['particles'][0]),history['global_best_fitness'][frame]))
+        ax2.set_xlim(2,len(history['global_best_fitness']))
+        ax2.set_ylim(10e-16,10e0)
+        ax2.set_yscale('log')
+
+        # data to be plot
+        data = history['particles'][frame]
+        global_best = np.array(history['global_best_fitness'])
+
+        # contour and global minimum
+        contour = ax1.contour(X,Y,Z, levels=50, cmap="magma")
+        ax1.plot(minima[0], minima[1] ,marker='o', color='black')
+
+        # plot fishes
+        ax1.scatter(data[:,0], data[:,1], marker='x', color='black')
+        if frame > 1:
+            for i in range(len(data)):
+                ax1.plot([history['particles'][frame-n][i][0] for n in range(2,-1,-1)],
+                         [history['particles'][frame-n][i][1] for n in range(2,-1,-1)])
+        elif frame == 1:
+            for i in range(len(data)):
+                ax1.plot([history['particles'][frame-n][i][0] for n in range(1,-1,-1)],
+                         [history['particles'][frame-n][i][1] for n in range(1,-1,-1)])
+
+        # plot current global best
+        x_range = np.arange(1, frame+2)
+        ax2.plot(x_range, global_best[0:frame+1])
+        
+    # title of figure
+    fig.suptitle('Optimizing {} function by PSO; global min:({},{})={}'.format(func_name.split()[0],
+                                                                      minima[0],minima[1],
+                                                                      func(minima)),fontsize=20)
+
+    #animation display
+    ani = animation.FuncAnimation(fig, animate, fargs=(history,),
+                    frames=len(history['particles']), interval=250, repeat=False, blit=False)
+
+    ## Save animation as mp4 if selected to
+    if save2mp4:
+        os.makedirs('mp4/', exist_ok=True)
+        ani.save('mp4/PSO_{}_population_{}.mp4'.format(func_name.split()[0], len(history['particles'][0])), writer="ffmpeg", dpi=100)
+        print('A mp4 video is saved at mp4/')
+    elif save2gif:
+        os.makedirs('gif/', exist_ok=True)
+        ani.save('gif/PSO_{}_population_{}.gif'.format(func_name.split()[0], len(history['particles'][0])), writer="imagemagick")
+        print('A gif video is saved at gif/')
+    else:
+        plt.show()
+
+#---DEFINE WHAT FUNCTIONS TO MINIMIZE-----------------------------------------------+
+
+#experiment definition
+def run_experiment():
+    # RUN PSO Algorithm
+    # Current test set: ['Rosenbrock Function', 'Ackley Function','Paraboloid']
+    # settings
+    save2mp4 = False
+    save2gif = False
+    obj_functions = [paraboloid,rosenbrock_fun, ackley_fun]
+    obj_func_names = ['Paraboloid','Rosenbrock Function', 'Ackley Function']
+    each_boundaries = [
+        [[-10,10],[-10,10]],
+        [[-2,2],[-2,2]],
+        [[-32,32],[-32,32]]
+        
+    ]
+    global_minima = [
+        [0,0],
+        [1,1],
+        [0,0]
+    ]
+    swarmsizes_for_each_trial = [35]
+    num_iterations = 50
+
+    # experiments
+    for ofunc, ofname, bounds, g_minimum in zip(obj_functions, obj_func_names, each_boundaries, global_minima):
+        for swarm_size in swarmsizes_for_each_trial:
+            # pso
+            history = pso(func=ofunc, 
+                        bounds=bounds, 
+                        swarm_size=swarm_size, 
+                        num_iters=num_iterations, 
+                        verbose=0, 
+                        func_name=ofname)
+            print('global best:',history['global_best_fitness'][-1], ', global best position:', history['global_best'][-1])
+            # visualize
+            visualizeHistory2D(func=ofunc, 
+                            history=history, 
+                            bounds=bounds, 
+                            minima=g_minimum, 
+                            func_name=ofname, 
+                            save2mp4=save2mp4,
+                            save2gif=save2gif)
+
     
 #---RUN------------------------------------------------------------------------+    
 
-x0 = [5,5]                   #starting location [x1,x2,x3,....]
-bounds = [(-10,10),(-10,10)] #bounds for search [(x1min,x1max),(x2min,x2max),..]
-num_particles = 20           #number of swarm particles
-maxiter = 30                 #number of steps
-PSO.particle_swarm(func1,x0,bounds,num_particles,maxiter)
+##Runs experiment as defined above: 
+run_experiment() 
 
-#---ANIMATIONS-(WIP)------------------------------------------------------------+    
-
-#generate figure 
-fig, ax = plt.subplots()
-ax = plt.axes(xlim = (-10,10),ylim = (-10,10)) #change to be defined by bounds
-n = maxiter
-xdata_ani, ydata_ani = [], []
-ln, = plt.plot([],[],'ro')
-xdata_fields = np.array(xdata_fields)
-ydata_fields = np.array(ydata_fields)
-
-#print(ydata_fields[4,4]) #check that its actually a 2D matrix; wont be O.O.B.
-
-def init():
-    ax.set_xlim(-1,1)
-    ax.set_ylim(-1,1)
-    return ln,
-
-def update(frame):
-    xdata_ani = xdata_fields[frame].tolist()
-    ydata_ani = ydata_fields[frame].tolist()
-    ln.set_data(xdata_ani,ydata_ani)
-    #plt.plot(xdata[frame],ydata[frame],'ro')
-    return ln,
-
-ani = FuncAnimation(fig,update,frames=len(xdata_fields),interval=1000)
-plt.show()
-#ani.save('swarm_ani.gif',writer='pillow')
+##If you want to manually run one test case, uncomment and put in function:
+#history = pso(ackley_fun, bounds=[[-32,32],[-32,32]], swarm_size=30, inertia=0.5, num_iters=50, verbose=1, func_name='Ackley Function')
+#print('global best:',history['global_best'][-1], ', global best position:', history['global_best'][-1])
+#visualizeHistory2D(func=ackley_fun, history=history, bounds=[[-32,32],[-32,32]], minima=[0,0], func_name='Ackley Function', save2mp4=False, save2gif=False,)
 
 #---END------------------------------------------------------------------------+    
