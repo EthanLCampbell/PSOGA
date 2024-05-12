@@ -7,7 +7,6 @@
 #------------------------------------------------------------------------------+
 
 #-------Libraries and Dependencies:--------------------------------------------+
-from __future__ import division
 import numpy as np
 import random
 import math
@@ -84,8 +83,8 @@ class Particle:
 class PSO():
     def particle_swarm(costFunction,x0,bounds,num_particles,maxiter):
         global num_dimensions #number for total 
-        global xdata
-        global ydata
+        global xdata_fields
+        global ydata_fields
 
         num_dimensions = len(x0)
         group_error_best = -1            #best error for the group
@@ -117,15 +116,19 @@ class PSO():
                 swarm[j].update_velocity(group_best_position)
                 swarm[j].update_position(bounds)
             
-            #make globals of positions to animate:
+            #arrays of position to be animated:
+            xdata_fields = []
+            ydata_fields = []
             for j in range(0,num_particles):
-                xdata.append(swarm[j].position_i[0])
-                ydata.append(swarm[j].position_i[1])
-
+                xdata = []
+                ydata = []
+                for n in range(0,maxiter):
+                    xdata.append(swarm[j].position_i[0])
+                    ydata.append(swarm[j].position_i[1])
+                xdata_fields.append(xdata)
+                ydata_fields.append(ydata)
             #loop again
             i+=1
-       
-       
 
         #print final results
         print('Final:')
@@ -146,25 +149,29 @@ PSO.particle_swarm(func1,x0,bounds,num_particles,maxiter)
 
 #generate figure 
 fig, ax = plt.subplots()
-ax = plt.axes(xlim = bounds[0],ylim = bounds[1]) #change to be defined by bounds
-n = num_particles
-ln, = plt.plot([],[],'ro',lw=2)
+ax = plt.axes(xlim = (-10,10),ylim = (-10,10)) #change to be defined by bounds
+n = maxiter
+xdata_ani, ydata_ani = [], []
+ln, = plt.plot([],[],'ro')
+xdata_fields = np.array(xdata_fields)
+ydata_fields = np.array(ydata_fields)
 
-#def init():
-#    ax.set_xlim(-1,1)
-#    ax.set_ylim(-1,1)
-#    return ln,
+#print(ydata_fields[4,4]) #check that its actually a 2D matrix; wont be O.O.B.
 
-def update(frame):
-    xdata_ani = xdata[frame]
-    ydata_ani = ydata[frame]
-    #ln.set_data(xdata_ani,ydata_ani)
-    plt.plot(xdata[frame],ydata[frame],'ro')
+def init():
+    ax.set_xlim(-1,1)
+    ax.set_ylim(-1,1)
     return ln,
 
-ani = FuncAnimation(fig,update,frames=len(xdata),interval=1000)
+def update(frame):
+    xdata_ani = xdata_fields[frame].tolist()
+    ydata_ani = ydata_fields[frame].tolist()
+    ln.set_data(xdata_ani,ydata_ani)
+    #plt.plot(xdata[frame],ydata[frame],'ro')
+    return ln,
+
+ani = FuncAnimation(fig,update,frames=len(xdata_fields),interval=1000)
 plt.show()
 #ani.save('swarm_ani.gif',writer='pillow')
 
 #---END------------------------------------------------------------------------+    
-
