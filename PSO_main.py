@@ -10,7 +10,7 @@
 import numpy as np
 import random
 import math
-from pso.cost_functions import sphere #another function to check with
+#from pso.cost_functions import sphere #another function to check with
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import PillowWriter
@@ -46,7 +46,7 @@ def rosenbrock_fun(x):
 #---OPTIMIZATION ALGORITHMS ----------------------------------------------------+    
 
 #particle swarm optimization function
-def pso(func, bounds, swarm_size=10, inertia=0.5, c1=0.7, c2=0.9, 
+def pso(func, bounds, swarm_size=10, inertia=0.6, c1=0.7, c2=0.9, 
         max_vnorm=10, num_iters=100, verbose=False, func_name=None):
     # """Particle Swarm Optimization (PSO)
     # Input:
